@@ -4,16 +4,13 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import AuthCard from "@/components/auth/AuthCard";
 import Link from "next/link";
+import { API_BASE_URL } from "@/lib/api";
 
 export default function RegisterForm() {
-  const [email, setEmail] = useState("");
-  const [institute, setInstitute] = useState("");
-  const [loading, setLoading] = useState(false);
-
   async function onGithub() {
-    // frontend stub — backend integration will provide real redirect
-    setLoading(true);
-    window.location.href = "/api/auth/github";
+    // registration now collects institute/email on the verification step
+    // Use configured API base so environments (dev/prod) work without code changes
+    window.location.href = `${API_BASE_URL}/auth/github`;
   }
 
   return (
@@ -21,21 +18,7 @@ export default function RegisterForm() {
       <h3 className="text-xl font-semibold mb-4">Create your JKSoC account</h3>
 
       <div className="flex flex-col gap-4">
-        <label className="text-sm text-muted-foreground">Institute</label>
-        <input
-          className="rounded-md border border-input bg-transparent px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/50"
-          value={institute}
-          onChange={(e) => setInstitute(e.target.value)}
-          placeholder="Your institute name"
-        />
-
-        <label className="text-sm text-muted-foreground">Institute Email</label>
-        <input
-          className="rounded-md border border-input bg-transparent px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/50"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="institute email"
-        />
+        <p className="text-sm text-muted-foreground">You will be asked to verify your institute email after GitHub sign-in.</p>
 
         <div className="flex items-center gap-2 mt-4">
           <Button onClick={onGithub} className="flex-1">Continue with GitHub</Button>
