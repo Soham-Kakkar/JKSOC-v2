@@ -1,0 +1,129 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Otp {
+  id        Int      @id @default(autoincrement())
+  email     String
+  code      String
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("otps")
+}
+
+model User {
+  id                 Int      @id @default(autoincrement())
+  githubId           BigInt   @unique @map("github_id")
+  githubUsername     String   @map("github_username")
+  institute          String?
+  instituteEmail     String?   @unique @map("institute_email")
+  instituteVerified  Boolean  @default(false) @map("institute_verified")
+  suspicionScore     Int      @default(0) @map("suspicion_score")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  roles              UserRole[]
+  repositories       Repository[]
+  contributorStats   ContributorStats?
+  maintainerStats    MaintainerStats?
+  contributions      Contribution[]
+  processedPrs       ProcessedPr[]
+
+  @@map("users")
+}
+
+model Role {
+  id    Int        @id @default(autoincrement())
+  name  String     @unique
+  users UserRole[]
+
+  @@map("roles")
+}
+
+model UserRole {
+  userId Int  @map("user_id")
+  roleId Int  @map("role_id")
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model Repository {
+  id        Int      @id @default(autoincrement())
+  repoUrl   String   @unique @map("repo_url")
+  status    RepoStatus
+  createdBy Int?     @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  creator   User?    @relation(fields: [createdBy], references: [id])
+  contributions Contribution[]
+  processedPrs  ProcessedPr[]
+
+  @@map("repositories")
+}
+
+enum RepoStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model ContributorStats {
+  userId               Int       @id @map("user_id")
+  score                Int       @default(0)
+  prCount              Int       @default(0) @map("pr_count")
+  issueCount           Int       @default(0) @map("issue_count")
+  firstPrAwarded       Boolean   @default(false) @map("first_pr_awarded")
+  firstContributionAt  DateTime? @map("first_contribution_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("contributor_stats")
+}
+
+model MaintainerStats {
+  userId             Int      @id @map("user_id")
+  reposCount         Int      @default(0) @map("repos_count")
+  prsMergedCount     Int      @default(0) @map("prs_merged_count")
+  issuesCount        Int      @default(0) @map("issues_count")
+  contributorsCount  Int      @default(0) @map("contributors_count")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("maintainer_stats")
+}
+
+model Contribution {
+  userId      Int      @map("user_id")
+  repoId      Int      @map("repo_id")
+  issueNumber Int      @map("issue_number")
+  prId        BigInt?  @map("pr_id")
+
+  user User       @relation(fields: [userId], references: [id])
+  repo Repository @relation(fields: [repoId], references: [id])
+
+  @@id([userId, repoId, issueNumber])
+  @@map("contributions")
+}
+
+model ProcessedPr {
+  prId        BigInt   @id @map("pr_id")
+  repoId      Int      @map("repo_id")
+  issueNumber Int      @map("issue_number")
+  userId      Int      @map("user_id")
+  processedAt DateTime @default(now()) @map("processed_at")
+
+  repo Repository @relation(fields: [repoId], references: [id])
+  user User       @relation(fields: [userId], references: [id])
+
+  @@map("processed_prs")
+}
