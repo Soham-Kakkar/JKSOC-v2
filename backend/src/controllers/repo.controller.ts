@@ -62,3 +62,50 @@ export const approveRepo = async (req: Request, res: Response) => {
     return res.status(500).json({ message: 'Failed to approve repository' })
   }
 }
+
+export const getPendingRepos = async (req: Request, res: Response) => {
+  const user = req.user as any
+  if (!user) return res.sendStatus(401)
+
+  const isOrganizer = (user.roles || []).some((r: any) => r.role?.name === 'ORGANIZER')
+  if (!isOrganizer) return res.status(403).json({ message: 'Only organizers can view pending repositories' })
+
+  try {
+    const repos = await repoService.findPendingRepositories()
+    return res.json(repos)
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({ message: 'Failed to load pending repositories' })
+  }
+}
+
+export const getApprovedRepos = async (req: Request, res: Response) => {
+  try {
+    const repos = await repoService.findApprovedRepositories()
+
+    // attempt to fetch GitHub description for each repo (best-effort)
+    const enhanced = await Promise.all(repos.map(async (r: any) => {
+      try {
+        // repoUrl stored as github.com/owner/repo
+        const parts = r.repoUrl.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')
+        const owner = parts[1]
+        const name = parts[2]
+        if (owner && name) {
+          const ghRes = await fetch(`https://api.github.com/repos/${owner}/${name}`)
+          if (ghRes.ok) {
+            const info = await ghRes.json()
+            return { ...r, description: info.description || null }
+          }
+        }
+      } catch (err) {
+        console.error('GitHub fetch failed', err)
+      }
+      return { ...r, description: null }
+    }))
+
+    return res.json(enhanced)
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({ message: 'Failed to load approved repositories' })
+  }
+}

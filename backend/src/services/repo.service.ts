@@ -30,6 +30,14 @@ export const findRepositoryById = async (id: number) => {
   return prisma.repository.findUnique({ where: { id } })
 }
 
+export const findPendingRepositories = async () => {
+  return prisma.repository.findMany({ where: { status: 'PENDING' }, include: { creator: true } })
+}
+
+export const findApprovedRepositories = async () => {
+  return prisma.repository.findMany({ where: { status: 'APPROVED' }, include: { creator: true }, orderBy: { createdAt: 'desc' } })
+}
+
 export const approveRepository = async (id: number) => {
   return prisma.repository.update({
     where: { id },

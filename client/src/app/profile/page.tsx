@@ -40,6 +40,12 @@ export default function ProfilePage() {
 
   type RoleEntry = { role?: { name?: string } }
   const isMaintainer = !!user?.roles?.some?.((r: RoleEntry) => r.role?.name === 'MAINTAINER')
+  const isOrganizer = !!user?.roles?.some?.((r: RoleEntry) => r.role?.name === 'ORGANIZER')
+
+  // Organizer: pending repositories to review
+  const [pendingRepos, setPendingRepos] = useState<Array<{ id: number; repoUrl: string; creator?: { githubUsername?: string }; createdBy?: number }>>([])
+  const [pendingLoading, setPendingLoading] = useState(false)
+  const [pendingError, setPendingError] = useState<string | null>(null)
 
   React.useEffect(() => {
     const init = async () => {
@@ -47,6 +53,45 @@ export default function ProfilePage() {
     }
     init()
   }, [])
+
+  React.useEffect(() => {
+    if (!isOrganizer) return
+    let mounted = true
+    const load = async () => {
+      setPendingLoading(true)
+      setPendingError(null)
+      try {
+        const res = await apiFetch('/repos/pending')
+        if (!res.ok) throw new Error('Failed to fetch')
+        const data = await res.json()
+        if (!mounted) return
+        setPendingRepos(data || [])
+      } catch (err) {
+        console.error(err)
+        const msg = (err instanceof Error) ? err.message : 'Failed to load'
+        if (mounted) setPendingError(msg)
+      } finally {
+        if (mounted) setPendingLoading(false)
+      }
+    }
+    load()
+    return () => { mounted = false }
+  }, [isOrganizer])
+
+  const approvePendingRepo = async (id: number) => {
+    try {
+      const res = await apiFetch(`/repos/${id}/approve`, { method: 'POST' })
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json?.message || 'Failed to approve')
+      }
+      // remove from list
+      setPendingRepos(prev => prev.filter(r => r.id !== id))
+    } catch (err) {
+      console.error(err)
+      // keep failure silent; could surface to UI
+    }
+  }
 
   const submitRepo = async (e?: React.FormEvent) => {
     e?.preventDefault()
@@ -112,22 +157,23 @@ export default function ProfilePage() {
               <div><strong>Institute verified:</strong> {user.instituteVerified ? 'Yes' : 'No'}</div>
             </div>
           </CardContent>
-          <CardFooter className='mt-auto'>
+          <CardFooter className='mt-auto flex flex-col gap-3'>
             <Button onClick={() => setShowConfirm(true)} disabled={busy || !!user?.roles?.some?.((r) => r.role?.name === 'MAINTAINER') || !user.instituteVerified}>
-            Become a Maintainer
+              Become a Maintainer
             </Button>
             {message && <div className="mt-3 text-sm">{message}</div>}
           </CardFooter>
         </Card>
 
         <div className="md:col-span-2 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Maintainer Actions</CardTitle>
-              <CardDescription>Submit repositories for organizer review</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isMaintainer ? (
+
+          {isMaintainer && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Maintainer Actions</CardTitle>
+                <CardDescription>Submit repositories for organizer review</CardDescription>
+              </CardHeader>
+              <CardContent>
                 <form onSubmit={submitRepo} className="space-y-3">
                   <div>
                     <label className="block text-sm font-medium text-muted-foreground">Repository URL</label>
@@ -139,13 +185,41 @@ export default function ProfilePage() {
                     {repoMessage && <div className="text-sm text-muted-foreground">{repoMessage}</div>}
                   </div>
                 </form>
-              ) : (
-                <div>
-                  <p className="text-sm">You must be a maintainer to submit repositories. Upgrade your account if eligible.</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
+
+          {isOrganizer && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Organizer Actions</CardTitle>
+                <CardDescription>Repositories awaiting verification</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {pendingLoading ? (
+                  <div className="text-sm">Loading pending repositories…</div>
+                ) : pendingError ? (
+                  <div className="text-sm text-red-500">{pendingError}</div>
+                ) : pendingRepos.length === 0 ? (
+                  <div className="text-sm text-muted-foreground">No repositories awaiting verification.</div>
+                ) : (
+                  <div className="space-y-3">
+                    {pendingRepos.map((r: { id: number; repoUrl: string; creator?: { githubUsername?: string }; createdBy?: number }) => (
+                      <div key={r.id} className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="font-medium">{r.repoUrl}</div>
+                          <div className="text-sm text-muted-foreground">Submitted by {r.creator?.githubUsername || r.createdBy}</div>
+                        </div>
+                        <div className="ml-4">
+                          <Button size="sm" onClick={() => approvePendingRepo(r.id)}>Verify</Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>

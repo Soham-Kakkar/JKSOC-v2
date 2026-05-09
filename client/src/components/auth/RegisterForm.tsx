@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { API_BASE_URL } from "@/lib/api";
-import { Card, CardContent, CardHeader } from "../ui/card";
+import { Card, CardHeader } from "../ui/card";
 
 export default function RegisterForm() {
   const [role, setRole] = useState<'CONTRIBUTOR' | 'MAINTAINER'>('CONTRIBUTOR')
