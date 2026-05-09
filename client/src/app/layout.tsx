@@ -1,22 +1,10 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import Providers from "@/components/Providers";
-
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+import FramerBg from "@/components/FramerBg";
 
 export const metadata: Metadata = {
   title: "JKSoC — All India Summer Of Code",
@@ -29,17 +17,15 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       lang="en"
       className={cn(
         "h-full antialiased",
-        geistSans.variable,
-        geistMono.variable,
         "font-sans",
-        inter.variable,
         "dark"
       )}
     >
-      <body className="min-h-full flex flex-col bg-background text-foreground">
+      <body className="min-h-full">
+        <FramerBg />
         <Providers>
           <Navbar />
-          <main className="flex-1">{children}</main>
+          <main className="flex items-center justify-center font-sans w-full min-h-[80vh] px-6 py-12 min-w-0">{children}</main>
           <Footer />
         </Providers>
       </body>

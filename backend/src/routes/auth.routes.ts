@@ -5,7 +5,12 @@ import { authenticateJWT } from '../middleware/auth.middleware'
 
 const router = Router()
 
-router.get('/github', passport.authenticate('github', { scope: ['user:email'] }))
+// Allow passing desired role via query param `role` (e.g. ?role=MAINTAINER)
+router.get('/github', (req, res, next) => {
+  const role = req.query.role as string | undefined
+  const state = role ? role : undefined
+  passport.authenticate('github', { scope: ['user:email'], state })(req, res, next)
+})
 
 router.get(
   '/github/callback',

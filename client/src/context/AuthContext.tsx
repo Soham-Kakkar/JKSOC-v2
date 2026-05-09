@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from "react";
 import { apiFetch, getAuthToken, setAuthToken, removeAuthToken } from "@/lib/api";
 
-type User = { id: number; githubUsername: string; instituteVerified?: boolean }
+type User = { id: number; githubUsername: string; instituteVerified?: boolean, roles?: { role: { name: string } }[] }
 
 type AuthContextValue = {
   user: User | null

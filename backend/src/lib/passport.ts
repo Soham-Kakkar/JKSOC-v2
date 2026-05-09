@@ -9,16 +9,21 @@ passport.use(
       clientID: process.env.GITHUB_CLIENT_ID!,
       clientSecret: process.env.GITHUB_CLIENT_SECRET!,
       callbackURL: process.env.GITHUB_CALLBACK_URL!,
+      passReqToCallback: true,
     },
-    async (accessToken: string, refreshToken: string, profile: any, done: any) => {
+    async (req: any, accessToken: string, refreshToken: string, profile: any, done: any) => {
       try {
         const githubId = BigInt(profile.id)
         const githubUsername = profile.username
 
+        // allow requested role to be passed via the OAuth "state" parameter
+        const requestedRole = (req.query && (req.query.state || req.query.role))
+        const roleName = requestedRole === 'MAINTAINER' ? 'MAINTAINER' : undefined
+
         let user = await userService.findUserByGithubId(githubId)
 
         if (!user) {
-          user = await userService.createUser(githubId, githubUsername)
+          user = await userService.createUser(githubId, githubUsername, roleName)
         }
 
         return done(null, user)

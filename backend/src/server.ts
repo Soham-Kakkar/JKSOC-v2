@@ -4,6 +4,8 @@ import cors from 'cors'
 import passport from './lib/passport'
 import authRoutes from './routes/auth.routes'
 import instituteRoutes from './routes/institute.routes'
+import repoRoutes from './routes/repo.routes'
+import profileRoutes from './routes/profile.routes'
 
 // BigInt JSON serialization fix
 ;(BigInt.prototype as any).toJSON = function () {
@@ -21,6 +23,8 @@ app.use(passport.initialize())
 // Routes
 app.use('/api/auth', authRoutes)
 app.use('/api/institute', instituteRoutes)
+app.use('/api/repos', repoRoutes)
+app.use('/api/profile', profileRoutes)
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' })

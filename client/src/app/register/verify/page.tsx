@@ -1,10 +1,10 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import AuthCard from "@/components/auth/AuthCard"
 import { apiFetch } from "@/lib/api"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 
 export default function VerifyInstitutePage() {
   const router = useRouter()
@@ -95,15 +95,14 @@ export default function VerifyInstitutePage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <AuthCard>
-        <h2 className="text-xl font-semibold mb-4">
-          Enter Verification Code
-        </h2>
+      <Card className="max-w-md mx-auto text-center">
+        <CardHeader className="text-xl font-semibold mb-4">
+            Enter Verification Code
+        </CardHeader>
 
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
         {step === 1 ? (
-          <div className="flex flex-col gap-4">
+          <CardContent className="flex flex-col gap-4">
             <label className="text-sm text-muted-foreground">Institute</label>
             <input
               className="rounded-md border border-input bg-transparent px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/50"
@@ -131,9 +130,9 @@ export default function VerifyInstitutePage() {
                 {loading ? 'Sending...' : 'Send OTP'}
               </Button>
             </div>
-          </div>
+          </CardContent>
         ) : (
-          <div className="flex flex-col gap-4">
+          <CardContent className="flex flex-col gap-4">
             <p className="text-sm text-muted-foreground mb-2">
               We&apos;ve sent a 6-digit code to <b>{email}</b>.
             </p>
@@ -148,9 +147,8 @@ export default function VerifyInstitutePage() {
             <Button onClick={handleVerifyOtp} disabled={loading}>
               {loading ? "Verifying..." : "Verify OTP"}
             </Button>
-          </div>
+          </CardContent>
         )}
-      </AuthCard>
-    </div>
+      </Card>
   )
 }
