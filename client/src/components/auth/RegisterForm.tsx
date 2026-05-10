@@ -1,6 +1,8 @@
 "use client"
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { API_BASE_URL } from "@/lib/api";
@@ -8,6 +10,14 @@ import { Card, CardHeader } from "../ui/card";
 
 export default function RegisterForm() {
   const [role, setRole] = useState<'CONTRIBUTOR' | 'MAINTAINER'>('CONTRIBUTOR')
+  const router = useRouter()
+  const { user, loading } = useAuth()
+
+  useEffect(() => {
+    if (!loading && user) {
+      router.push('/profile')
+    }
+  }, [user, loading, router])
 
   async function onGithub(selectedRole: typeof role) {
     const roleParam = selectedRole === 'MAINTAINER' ? '?role=MAINTAINER' : ''

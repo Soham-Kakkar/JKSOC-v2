@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState } from 'react'
+import Link from 'next/link'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardDescription, CardFooter, CardContent } from '@/components/ui/card'
@@ -145,7 +146,7 @@ export default function ProfilePage() {
     <main className="max-w-7xl mx-auto p-6 w-full">
       <h1 className="text-2xl font-bold mb-4 text-center">Profile</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card className="flex flex-col h-fit">
           <CardHeader>
             <CardTitle>Account</CardTitle>
@@ -158,10 +159,29 @@ export default function ProfilePage() {
             </div>
           </CardContent>
           <CardFooter className='mt-auto flex flex-col gap-3'>
-            <Button onClick={() => setShowConfirm(true)} disabled={busy || !!user?.roles?.some?.((r) => r.role?.name === 'MAINTAINER') || !user.instituteVerified}>
-              Become a Maintainer
-            </Button>
-            {message && <div className="mt-3 text-sm">{message}</div>}
+            {!isMaintainer && (
+              <>
+                <Button onClick={() => setShowConfirm(true)} disabled={busy || !user.instituteVerified}>
+                  Become a Maintainer
+                </Button>
+                {message && <div className="mt-3 text-sm">{message}</div>}
+              </>
+            )}
+          </CardFooter>
+        </Card>
+
+        <Card className='flex flex-col h-fit'>
+          <CardHeader>
+            <CardTitle>Repositories</CardTitle>
+            <CardDescription>Browse and manage repositories</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-sm text-muted-foreground">Visit the repositories page to explore or submit repositories.</div>
+          </CardContent>
+          <CardFooter>
+            <Link href="/repos">
+              <Button>Go to Repositories</Button>
+            </Link>
           </CardFooter>
         </Card>
 
