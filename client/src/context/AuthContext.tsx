@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from "react";
 import { apiFetch, getAuthToken, setAuthToken, removeAuthToken } from "@/lib/api";
+import { useRouter } from "next/navigation";
 
 type User = { id: number; githubUsername: string; instituteVerified?: boolean, roles?: { role: { name: string } }[] }
 
@@ -20,6 +21,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState<boolean>(() => !!getAuthToken())
   const inflight = useRef<Promise<User | null> | null>(null)
+  const router = useRouter()
 
   const fetchMe = useCallback(async (): Promise<User | null> => {
     // reuse in-flight request to avoid duplicated /auth/me calls
@@ -68,6 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = () => {
     removeAuthToken()
     setUser(null)
+    router.push('/')
   }
 
   const refresh = useCallback(async () => fetchMe(), [fetchMe])

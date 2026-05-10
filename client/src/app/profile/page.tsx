@@ -142,7 +142,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <main className="max-w-5xl mx-auto p-6">
+    <main className="max-w-7xl mx-auto p-6 w-full">
       <h1 className="text-2xl font-bold mb-4 text-center">Profile</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

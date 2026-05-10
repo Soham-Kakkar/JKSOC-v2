@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table'
 import { apiFetch } from '@/lib/api'
+import Link from 'next/link'
 
 type Repo = {
   id: number
@@ -23,12 +24,34 @@ export default function RepositoriesPage() {
     const load = async () => {
       setLoading(true)
       setError(null)
+      // client-side cache (localStorage) to reduce backend calls
+      try {
+        const raw = localStorage.getItem('approved_repos_v1')
+        if (raw) {
+          const parsed = JSON.parse(raw)
+          const age = Date.now() - (parsed.updatedAt || 0)
+          const TTL = 1000 * 60 * 10 // 10 minutes
+          if (parsed?.data && age < TTL) {
+            setRepos(parsed.data)
+            setLoading(false)
+            return
+          }
+        }
+      } catch (e) {
+        // ignore cache parse errors
+        console.warn('cache read failed', e)
+      }
       try {
         const res = await apiFetch('/repos')
         if (!res.ok) throw new Error('Failed to fetch')
         const data = await res.json()
         if (!mounted) return
         setRepos(data || [])
+        try {
+          localStorage.setItem('approved_repos_v1', JSON.stringify({ updatedAt: Date.now(), data }))
+        } catch (e) {
+          console.warn('cache write failed', e)
+        }
       } catch (err) {
         console.error(err)
         setError(err instanceof Error ? err.message : 'Failed to load')
@@ -41,7 +64,7 @@ export default function RepositoriesPage() {
   }, [])
 
   return (
-    <div className="fw-full px-4 flex flex-col justify-center items-center">
+    <div className="w-full px-4 flex flex-col justify-center items-center">
       <h1 className="text-2xl font-bold mb-6">Repositories</h1>
       {loading ? (
         <p>Loading...</p>
@@ -59,7 +82,7 @@ export default function RepositoriesPage() {
           </CardHeader>
 
           <CardContent>
-            <Table className="min-w-[700px] max-w-full">
+            <Table className="max-w-full">
               <TableHeader>
                 <tr>
                   <TableHead>Repository</TableHead>
@@ -72,16 +95,25 @@ export default function RepositoriesPage() {
                 {repos.map((r) => (
                   <TableRow key={r.id}>
                     <TableCell>
-                      <a
+                      <Link
                         className="text-blue-600 hover:underline"
                         href={`https://${r.repoUrl}`}
                         target="_blank"
                         rel="noreferrer"
                       >
                         {r.repoUrl}
-                      </a>
+                      </Link>
                     </TableCell>
-                    <TableCell>{r.creator?.githubUsername || 'Unknown'}</TableCell>
+                    <TableCell>
+                      <Link
+                        className="hover:underline"
+                        href={`https://github.com/${r.creator?.githubUsername}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {r.creator?.githubUsername || 'Unknown'}
+                      </Link>
+                    </TableCell>
                     <TableCell>
                       {r.description || (
                         <span className="text-muted-foreground">

@@ -1,9 +1,10 @@
 import { Request, Response } from 'express'
 import * as repoService from '../services/repo.service'
+import { getRepoDescription } from '../lib/ghCache'
 
 export const submitRepo = async (req: Request, res: Response) => {
   const { repoUrl } = req.body
-  const user = req.user as any
+  const user = (req as any).user
 
   if (!repoUrl) {
     return res.status(400).json({ message: 'repoUrl is required' })
@@ -35,7 +36,7 @@ export const submitRepo = async (req: Request, res: Response) => {
 
 export const approveRepo = async (req: Request, res: Response) => {
   const id = Number(req.params.id)
-  const user = req.user as any
+  const user = (req as any).user
 
   if (Number.isNaN(id)) {
     return res.status(400).json({ message: 'Invalid repository id' })
@@ -64,7 +65,7 @@ export const approveRepo = async (req: Request, res: Response) => {
 }
 
 export const getPendingRepos = async (req: Request, res: Response) => {
-  const user = req.user as any
+  const user = (req as any).user
   if (!user) return res.sendStatus(401)
 
   const isOrganizer = (user.roles || []).some((r: any) => r.role?.name === 'ORGANIZER')
@@ -82,27 +83,19 @@ export const getPendingRepos = async (req: Request, res: Response) => {
 export const getApprovedRepos = async (req: Request, res: Response) => {
   try {
     const repos = await repoService.findApprovedRepositories()
-
-    // attempt to fetch GitHub description for each repo (best-effort)
+    // best-effort enrichment with caching and rate limiting
     const enhanced = await Promise.all(repos.map(async (r: any) => {
       try {
-        // repoUrl stored as github.com/owner/repo
-        const parts = r.repoUrl.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')
-        const owner = parts[1]
-        const name = parts[2]
-        if (owner && name) {
-          const ghRes = await fetch(`https://api.github.com/repos/${owner}/${name}`)
-          if (ghRes.ok) {
-            const info = await ghRes.json()
-            return { ...r, description: info.description || null }
-          }
-        }
+        const desc = await getRepoDescription(r.repoUrl)
+        return { ...r, description: desc }
       } catch (err) {
-        console.error('GitHub fetch failed', err)
+        console.error('enrich failed', err)
+        return { ...r, description: null }
       }
-      return { ...r, description: null }
     }))
 
+    // instruct clients to cache for short time
+    res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=600')
     return res.json(enhanced)
   } catch (err) {
     console.error(err)

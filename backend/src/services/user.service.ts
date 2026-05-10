@@ -2,14 +2,7 @@ import { prisma } from '../lib/prisma'
 
 export const findUserByGithubId = async (githubId: bigint) => {
   return prisma.user.findUnique({
-    where: { githubId },
-    include: {
-      roles: {
-        include: {
-          role: true,
-        },
-      },
-    },
+    where: { githubId }
   })
 }
 

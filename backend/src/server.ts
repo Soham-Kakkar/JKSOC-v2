@@ -2,6 +2,7 @@ import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
 import passport from './lib/passport'
+import Limiter from './middleware/rateLimiter.middleware'
 import authRoutes from './routes/auth.routes'
 import instituteRoutes from './routes/institute.routes'
 import repoRoutes from './routes/repo.routes'
@@ -19,6 +20,7 @@ const PORT = process.env.PORT || 5000
 app.use(cors())
 app.use(express.json())
 app.use(passport.initialize())
+app.use(Limiter)
 
 // Routes
 app.use('/api/auth', authRoutes)
