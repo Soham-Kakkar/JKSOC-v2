@@ -7,8 +7,8 @@
     "postinstall": "prisma generate",
     "dev": "tsx watch src/server.ts",
     "create-organizer": "tsx scripts/create_organizer.ts",
-    "build": "tsc && prisma migrate deploy",
-    "start": "node dist/server.js",
+    "build": "tsc",
+    "start": "prisma migrate deploy && node dist/server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "prisma": {
