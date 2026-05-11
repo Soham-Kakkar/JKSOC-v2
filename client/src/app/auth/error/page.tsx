@@ -4,8 +4,9 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardTitle } from '@/components/ui/card'
+import { Suspense } from 'react'
 
-export default function AuthErrorPage() {
+export function AuthErrorContent() {
   const searchParams = useSearchParams()
   const message = searchParams.get('message') || 'An unknown authentication error occurred.'
 
@@ -26,5 +27,13 @@ export default function AuthErrorPage() {
         </CardFooter>
       </Card>
     </div>
+  )
+}
+
+export default function AuthErrorPage() {
+  return (
+    <Suspense>
+      <AuthErrorContent />
+    </Suspense>
   )
 }

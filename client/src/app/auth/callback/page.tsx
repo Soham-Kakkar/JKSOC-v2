@@ -1,10 +1,10 @@
 "use client"
 
-import { useEffect } from 'react'
+import { Suspense, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 
-export default function AuthCallbackPage() {
+export function AuthCallbackContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const token = searchParams.get('token')
@@ -25,7 +25,6 @@ export default function AuthCallbackPage() {
         router.push('/')
       }
     })()
-    // only run when token changes
   }, [token, router, setToken])
 
   return (
@@ -35,5 +34,13 @@ export default function AuthCallbackPage() {
         <p className="text-muted-foreground">Please wait while we log you in.</p>
       </div>
     </div>
+  )
+}
+
+export default function AuthCallbackPage() {
+  return (
+    <Suspense>
+      <AuthCallbackContent />
+    </Suspense>
   )
 }
