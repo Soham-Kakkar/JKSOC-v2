@@ -7,7 +7,7 @@ import Providers from "@/components/Providers";
 import FramerBg from "@/components/FramerBg";
 
 export const metadata: Metadata = {
-  title: "JKSoC — All India Summer Of Code",
+  title: "JKSoC — Summer Of Code",
   description: "JKSoC platform for contributors across India",
 };
 
@@ -25,7 +25,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <FramerBg />
         <Providers>
           <Navbar />
-          <main className="flex items-center justify-center font-sans w-full min-h-[80vh] px-6 py-12 min-w-0">{children}</main>
+          <main className="flex justify-center font-sans w-full min-h-[80vh] px-6 py-12 min-w-0">{children}</main>
           <Footer />
         </Providers>
       </body>

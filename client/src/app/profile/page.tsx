@@ -1,256 +1,479 @@
 "use client"
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
+
 import { useAuth } from '@/context/AuthContext'
-import { Button } from '@/components/ui/button'
-import { Card, CardHeader, CardTitle, CardDescription, CardFooter, CardContent } from '@/components/ui/card'
 import { apiFetch } from '@/lib/api'
 
-function ConfirmUpgradeCard({ onCancel, onConfirm, busy }: { onCancel: () => void; onConfirm: () => Promise<void>; busy: boolean }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onCancel} />
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Separator } from '@/components/ui/separator'
 
-      <Card className="relative z-10 max-w-md w-full">
-        <CardHeader>
-          <CardTitle>Confirm Change</CardTitle>
-          <CardDescription>Upgrading will grant you the MAINTAINER role, which allows repository submissions that must be manually reviewed by organizers.</CardDescription>
+function ConfirmUpgradeCard({
+  onCancel,
+  onConfirm,
+  busy,
+}: {
+  onCancel: () => void
+  onConfirm: () => Promise<void>
+  busy: boolean
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onCancel}
+      />
+
+      <Card className="relative z-10 w-full max-w-md border-border/60 shadow-2xl">
+        <CardHeader className="space-y-3">
+          <CardTitle>Become a Maintainer?</CardTitle>
+
+          <CardDescription className="leading-relaxed">
+            Maintainers can submit repositories to JKSoC and collaborate with
+            contributors during the program.
+          </CardDescription>
         </CardHeader>
 
-        <CardFooter className="justify-end">
-          <Button variant="ghost" onClick={onCancel} disabled={busy}>Cancel</Button>
-          <Button onClick={onConfirm} disabled={busy}>{busy ? 'Changing…' : 'Confirm Change'}</Button>
+        <CardFooter className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={onCancel} disabled={busy}>
+            Cancel
+          </Button>
+
+          <Button onClick={onConfirm} disabled={busy}>
+            {busy ? 'Updating...' : 'Confirm'}
+          </Button>
         </CardFooter>
       </Card>
     </div>
   )
 }
 
+type RoleEntry = {
+  role?: {
+    name?: string
+  }
+}
+
+type PendingRepo = {
+  id: number
+  repoUrl: string
+  creator?: {
+    githubUsername?: string
+  }
+  createdBy?: number
+}
+
 export default function ProfilePage() {
   const { user, loading, refresh } = useAuth()
-  const [busy, setBusy] = useState(false)
-  const [message, setMessage] = useState<string | null>(null)
-  const [showConfirm, setShowConfirm] = useState(false)
+
   const [mounted, setMounted] = useState(false)
 
-  // Repo submission state (maintainers only)
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+
+  const [showConfirm, setShowConfirm] = useState(false)
+
   const [repoUrl, setRepoUrl] = useState('')
   const [repoBusy, setRepoBusy] = useState(false)
   const [repoMessage, setRepoMessage] = useState<string | null>(null)
 
-  type RoleEntry = { role?: { name?: string } }
-  const isMaintainer = !!user?.roles?.some?.((r: RoleEntry) => r.role?.name === 'MAINTAINER')
-  const isOrganizer = !!user?.roles?.some?.((r: RoleEntry) => r.role?.name === 'ORGANIZER')
-
-  // Organizer: pending repositories to review
-  const [pendingRepos, setPendingRepos] = useState<Array<{ id: number; repoUrl: string; creator?: { githubUsername?: string }; createdBy?: number }>>([])
+  const [pendingRepos, setPendingRepos] = useState<PendingRepo[]>([])
   const [pendingLoading, setPendingLoading] = useState(false)
   const [pendingError, setPendingError] = useState<string | null>(null)
 
-  React.useEffect(() => {
+  const isMaintainer = !!user?.roles?.some(
+    (r: RoleEntry) => r.role?.name === 'MAINTAINER'
+  )
+
+  const isOrganizer = !!user?.roles?.some(
+    (r: RoleEntry) => r.role?.name === 'ORGANIZER'
+  )
+
+  useEffect(() => {
     const init = async () => {
       setMounted(true)
     }
     init()
   }, [])
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!isOrganizer) return
-    let mounted = true
-    const load = async () => {
+
+    let active = true
+
+    const loadPendingRepos = async () => {
       setPendingLoading(true)
       setPendingError(null)
+
       try {
         const res = await apiFetch('/repos/pending')
-        if (!res.ok) throw new Error('Failed to fetch')
+
+        if (!res.ok) {
+          throw new Error('Failed to load repositories')
+        }
+
         const data = await res.json()
-        if (!mounted) return
+
+        if (!active) return
+
         setPendingRepos(data || [])
       } catch (err) {
         console.error(err)
-        const msg = (err instanceof Error) ? err.message : 'Failed to load'
-        if (mounted) setPendingError(msg)
+
+        if (!active) return
+
+        setPendingError('Could not load pending repositories.')
       } finally {
-        if (mounted) setPendingLoading(false)
+        if (active) {
+          setPendingLoading(false)
+        }
       }
     }
-    load()
-    return () => { mounted = false }
+
+    loadPendingRepos()
+
+    return () => {
+      active = false
+    }
   }, [isOrganizer])
-
-  const approvePendingRepo = async (id: number) => {
-    try {
-      const res = await apiFetch(`/repos/${id}/approve`, { method: 'POST' })
-      if (!res.ok) {
-        const json = await res.json().catch(() => ({}))
-        throw new Error(json?.message || 'Failed to approve')
-      }
-      // remove from list
-      setPendingRepos(prev => prev.filter(r => r.id !== id))
-    } catch (err) {
-      console.error(err)
-      // keep failure silent; could surface to UI
-    }
-  }
-
-  const submitRepo = async (e?: React.FormEvent) => {
-    e?.preventDefault()
-    if (!repoUrl) {
-      setRepoMessage('Please enter a GitHub repository URL')
-      return
-    }
-
-    setRepoBusy(true)
-    setRepoMessage(null)
-    try {
-      const res = await apiFetch('/repos/submit', { method: 'POST', body: JSON.stringify({ repoUrl }) })
-      if (res.status === 201) {
-        setRepoMessage('Repository submitted for review')
-        setRepoUrl('')
-      } else {
-        const json = await res.json()
-        setRepoMessage(json?.message || 'Failed to submit')
-      }
-    } catch (err) {
-      console.error(err)
-      setRepoMessage('Submission failed')
-    } finally {
-      setRepoBusy(false)
-    }
-  }
-
-  if (!mounted) return null
-
-  if (loading) return <div className="p-6">Loading...</div>
-  if (!user) return <div className="p-6">Not signed in.</div>
 
   const onUpgrade = async () => {
     setBusy(true)
     setMessage(null)
+
     try {
-      const res = await apiFetch('/profile/upgrade-maintainer', { method: 'POST' })
+      const res = await apiFetch('/profile/upgrade-maintainer', {
+        method: 'POST',
+      })
+
       const json = await res.json()
-      setMessage(json.message || 'Done')
-      // refresh user info
+
+      setMessage(json.message || 'Role updated successfully.')
+
       await refresh()
     } catch (err) {
       console.error(err)
-      setMessage('Change failed')
+
+      setMessage('Something went wrong.')
     } finally {
       setBusy(false)
     }
   }
 
-  return (
-    <main className="max-w-7xl mx-auto p-6 w-full">
-      <h1 className="text-2xl font-bold mb-4 text-center">Profile</h1>
+  const submitRepo = async (e?: React.FormEvent) => {
+    e?.preventDefault()
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="flex flex-col h-fit">
+    if (!repoUrl) {
+      setRepoMessage('Please enter a repository URL.')
+      return
+    }
+
+    setRepoBusy(true)
+    setRepoMessage(null)
+
+    try {
+      const res = await apiFetch('/repos/submit', {
+        method: 'POST',
+        body: JSON.stringify({ repoUrl }),
+      })
+
+      if (res.status === 201) {
+        setRepoMessage('Repository submitted for review.')
+        setRepoUrl('')
+      } else {
+        const json = await res.json()
+
+        setRepoMessage(json?.message || 'Submission failed.')
+      }
+    } catch (err) {
+      console.error(err)
+
+      setRepoMessage('Something went wrong.')
+    } finally {
+      setRepoBusy(false)
+    }
+  }
+
+  const approvePendingRepo = async (id: number) => {
+    try {
+      const res = await apiFetch(`/repos/${id}/approve`, {
+        method: 'POST',
+      })
+
+      if (!res.ok) {
+        throw new Error('Approval failed')
+      }
+
+      setPendingRepos((prev) => prev.filter((r) => r.id !== id))
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  if (!mounted) return null
+
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-5xl p-6">
+        <div className="text-muted-foreground">Loading profile...</div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return (
+      <div className="mx-auto max-w-5xl p-6">
+        <div className="text-muted-foreground">You are not signed in.</div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mx-auto max-w-6xl px-6 py-10">
+      <section className="space-y-4">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-2">
+            <h1 className="text-4xl font-black tracking-tight">
+              Your Profile
+            </h1>
+
+            <p className="text-muted-foreground">
+              Manage your account, repositories, and participation in JKSoC.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {isOrganizer && (
+              <Badge variant="default" className='py-3 px-4'>Organizer</Badge>
+            )}
+
+            {isMaintainer && (
+              <Badge variant="secondary" className='py-3 px-4'>Maintainer</Badge>
+            )}
+
+            {!isMaintainer && !isOrganizer && (
+              <Badge variant="outline">Contributor</Badge>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <Separator className="my-8" />
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Card className="border-border/60 lg:col-span-1">
           <CardHeader>
             <CardTitle>Account</CardTitle>
-            <CardDescription>Basic account information and actions</CardDescription>
+
+            <CardDescription>
+              Your JKSoC profile and verification status.
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <div><strong>GitHub:</strong> {user.githubUsername}</div>
-              <div><strong>Institute verified:</strong> {user.instituteVerified ? 'Yes' : 'No'}</div>
+
+          <CardContent className="space-y-5">
+            <div className="space-y-1">
+              <div className="text-sm text-muted-foreground">
+                GitHub Username
+              </div>
+
+              <div className="font-medium">
+                @{user.githubUsername}
+              </div>
             </div>
-          </CardContent>
-          <CardFooter className='mt-auto flex flex-col gap-3'>
-            {!isMaintainer && (
-              <>
-                <Button onClick={() => setShowConfirm(true)} disabled={busy || !user.instituteVerified}>
-                  Become a Maintainer
-                </Button>
-                {message && <div className="mt-3 text-sm">{message}</div>}
-              </>
+
+            <div className="space-y-1">
+              <div className="text-sm text-muted-foreground">
+                Institute Verification
+              </div>
+
+              <div>
+                {user.instituteVerified ? (
+                  <Badge variant="secondary" className='py-3 px-4'>
+                    Verified
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className='py-3 px-4'>
+                    Not Verified
+                  </Badge>
+                )}
+              </div>
+            </div>
+
+            {message && (
+              <div className="text-sm text-muted-foreground">
+                {message}
+              </div>
             )}
-          </CardFooter>
+          </CardContent>
+
+          {!isMaintainer && (
+            <CardFooter>
+              <Button
+                className="w-full"
+                disabled={busy || !user.instituteVerified}
+                onClick={() => setShowConfirm(true)}
+              >
+                Become a Maintainer
+              </Button>
+            </CardFooter>
+          )}
         </Card>
 
-        <Card className='flex flex-col h-fit'>
+        <Card className="border-border/60 lg:col-span-2">
           <CardHeader>
             <CardTitle>Repositories</CardTitle>
-            <CardDescription>Browse and manage repositories</CardDescription>
+
+            <CardDescription>
+              Explore approved repositories and manage submissions.
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="text-sm text-muted-foreground">Visit the repositories page to explore or submit repositories.</div>
+
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Browse repositories participating in JKSoC, discover issues to
+              work on, and track projects submitted by maintainers.
+            </p>
           </CardContent>
+
           <CardFooter>
             <Link href="/repos">
-              <Button>Go to Repositories</Button>
+              <Button>
+                Browse Repositories
+              </Button>
             </Link>
           </CardFooter>
         </Card>
+      </div>
 
-        <div className="md:col-span-2 space-y-6">
-
-          {isMaintainer && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Maintainer Actions</CardTitle>
-                <CardDescription>Submit repositories for organizer review</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={submitRepo} className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground">Repository URL</label>
-                    <input value={repoUrl} onChange={(e) => setRepoUrl(e.target.value)} placeholder="https://github.com/owner/repo" className="mt-1 w-full rounded-md border px-3 py-2" />
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Button type="submit" disabled={repoBusy}>{repoBusy ? 'Submitting…' : 'Submit for Review'}</Button>
-                    {repoMessage && <div className="text-sm text-muted-foreground">{repoMessage}</div>}
-                  </div>
-                </form>
-              </CardContent>
-            </Card>
-          )}
-
-          {isOrganizer && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Organizer Actions</CardTitle>
-                <CardDescription>Repositories awaiting verification</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {pendingLoading ? (
-                  <div className="text-sm">Loading pending repositories…</div>
-                ) : pendingError ? (
-                  <div className="text-sm text-red-500">{pendingError}</div>
-                ) : pendingRepos.length === 0 ? (
-                  <div className="text-sm text-muted-foreground">No repositories awaiting verification.</div>
-                ) : (
-                  <div className="space-y-3">
-                    {pendingRepos.map((r: { id: number; repoUrl: string; creator?: { githubUsername?: string }; createdBy?: number }) => (
-                      <div key={r.id} className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="font-medium">{r.repoUrl}</div>
-                          <div className="text-sm text-muted-foreground">Submitted by {r.creator?.githubUsername || r.createdBy}</div>
-                        </div>
-                        <div className="ml-4">
-                          <Button size="sm" onClick={() => approvePendingRepo(r.id)}>Verify</Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          <Card>
+      <div className="mt-8 space-y-6">
+        {isMaintainer && (
+          <Card className="border-border/60">
             <CardHeader>
-              <CardTitle>Recent Activity</CardTitle>
-              <CardDescription>Placeholder for contributions, submissions, and notifications</CardDescription>
+              <CardTitle>Submit a Repository</CardTitle>
+
+              <CardDescription>
+                Maintainers can submit repositories for organizer review.
+              </CardDescription>
             </CardHeader>
+
             <CardContent>
-              <div className="text-sm text-muted-foreground">No activity shown yet.</div>
+              <form
+                onSubmit={submitRepo}
+                className="space-y-4"
+              >
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">
+                    Repository URL
+                  </label>
+
+                  <Input
+                    value={repoUrl}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRepoUrl(e.target.value)}
+                    placeholder="https://github.com/owner/repository"
+                    className='mt-2'
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button type="submit" disabled={repoBusy}>
+                    {repoBusy ? 'Submitting...' : 'Submit Repository'}
+                  </Button>
+
+                  {repoMessage && (
+                    <p className="text-sm text-muted-foreground">
+                      {repoMessage}
+                    </p>
+                  )}
+                </div>
+              </form>
             </CardContent>
           </Card>
-        </div>
+        )}
+
+        {isOrganizer && (
+          <Card className="border-border/60">
+            <CardHeader>
+              <CardTitle>Pending Repository Reviews</CardTitle>
+
+              <CardDescription>
+                Repositories waiting for organizer approval.
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent>
+              {pendingLoading ? (
+                <div className="text-sm text-muted-foreground">
+                  Loading repositories...
+                </div>
+              ) : pendingError ? (
+                <div className="text-sm text-red-500">
+                  {pendingError}
+                </div>
+              ) : pendingRepos.length === 0 ? (
+                <div className="text-sm text-muted-foreground">
+                  No pending repositories right now.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {pendingRepos.map((repo) => (
+                    <div
+                      key={repo.id}
+                      className="flex flex-col gap-4 rounded-lg border p-4 md:flex-row md:items-center md:justify-between"
+                    >
+                      <div className="space-y-1">
+                        <div className="font-medium break-all">
+                          {repo.repoUrl}
+                        </div>
+
+                        <div className="text-sm text-muted-foreground">
+                          Submitted by{' '}
+                          {repo.creator?.githubUsername ||
+                            repo.createdBy}
+                        </div>
+                      </div>
+
+                      <Button
+                        size="sm"
+                        onClick={() =>
+                          approvePendingRepo(repo.id)
+                        }
+                      >
+                        Approve
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        <Card className="border-border/60">
+          <CardHeader>
+            <CardTitle>Recent Activity</CardTitle>
+
+            <CardDescription>
+              Contributions, submissions, and updates will appear here.
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent>
+            <div className="text-sm text-muted-foreground">
+              No recent activity yet.
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {showConfirm && (
@@ -263,6 +486,6 @@ export default function ProfilePage() {
           busy={busy}
         />
       )}
-    </main>
+    </div>
   )
 }
