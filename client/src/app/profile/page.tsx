@@ -59,6 +59,51 @@ function ConfirmUpgradeCard({
   )
 }
 
+function CreateOrganizerCard({ onCancel, onCreate, busy, githubValue, setGithub, instituteValue, setInstitute, emailValue, setEmail, errors }: { onCancel: () => void; onCreate: (e?: React.FormEvent) => Promise<void>; busy: boolean; githubValue: string; setGithub: (s:string)=>void; instituteValue: string; setInstitute: (s:string)=>void; emailValue: string; setEmail: (s:string)=>void; errors?: string[] | null }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onCancel} />
+
+      <Card className="relative z-10 w-full max-w-md border-border/60 shadow-2xl">
+        <CardHeader className="space-y-3">
+          <CardTitle>Create Organizer</CardTitle>
+
+          <CardDescription className="leading-relaxed">
+            All fields are required. Provide GitHub username, institute and a valid institute email.
+          </CardDescription>
+        </CardHeader>
+
+        <form onSubmit={onCreate}>
+          <CardContent>
+            {errors && errors.length > 0 && (
+              <div className="mb-3 space-y-1 text-sm text-red-600">
+                {errors.map((err, i) => (
+                  <div key={i}>• {err}</div>
+                ))}
+              </div>
+            )}
+            <div className="space-y-3 mt-1">
+              <label className="text-sm font-medium">GitHub Username</label>
+              <Input required value={githubValue} onChange={(e:React.ChangeEvent<HTMLInputElement>)=>setGithub(e.target.value)} />
+
+              <label className="text-sm font-medium">Institute</label>
+              <Input required value={instituteValue} onChange={(e:React.ChangeEvent<HTMLInputElement>)=>setInstitute(e.target.value)} />
+
+              <label className="text-sm font-medium">Institute Email</label>
+              <Input required type="email" value={emailValue} onChange={(e:React.ChangeEvent<HTMLInputElement>)=>setEmail(e.target.value)} />
+            </div>
+          </CardContent>
+
+          <CardFooter className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={onCancel} disabled={busy}>Cancel</Button>
+            <Button type="submit" disabled={busy}>{busy ? 'Creating...' : 'Create Organizer'}</Button>
+          </CardFooter>
+        </form>
+      </Card>
+    </div>
+  )
+}
+
 function ConfirmSubmitCard({ onCancel, onConfirm, busy }: { onCancel: () => void; onConfirm: () => Promise<void>; busy: boolean }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -134,6 +179,14 @@ export default function ProfilePage() {
   const [repoBusy, setRepoBusy] = useState(false)
   const [repoMessage, setRepoMessage] = useState<string | null>(null)
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false)
+
+  const [showCreateOrganizer, setShowCreateOrganizer] = useState(false)
+  const [newOrgGithub, setNewOrgGithub] = useState('')
+  const [newOrgInstitute, setNewOrgInstitute] = useState('')
+  const [newOrgEmail, setNewOrgEmail] = useState('')
+  const [createOrgBusy, setCreateOrgBusy] = useState(false)
+  const [createOrgMessage, setCreateOrgMessage] = useState<string | null>(null)
+  const [createOrgErrors, setCreateOrgErrors] = useState<string[] | null>(null)
 
   const [pendingRepos, setPendingRepos] = useState<PendingRepo[]>([])
   const [pendingLoading, setPendingLoading] = useState(false)
@@ -300,6 +353,59 @@ export default function ProfilePage() {
     }
   }
 
+  const handleCreateOrganizer = async (e?: React.FormEvent) => {
+    e?.preventDefault()
+    setCreateOrgBusy(true)
+    setCreateOrgMessage(null)
+    setCreateOrgErrors(null)
+
+    const errors: string[] = []
+    const ghRe = /^[A-Za-z0-9-]{1,39}$/
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+    if (!newOrgGithub || !ghRe.test(newOrgGithub)) {
+      errors.push('Valid GitHub username is required (1-39 chars, letters/numbers/hyphens)')
+    }
+    if (!newOrgInstitute || newOrgInstitute.trim().length === 0) {
+      errors.push('Institute is required')
+    }
+    if (!newOrgEmail || !emailRe.test(newOrgEmail)) {
+      errors.push('Valid institute email is required')
+    }
+
+    if (errors.length > 0) {
+      setCreateOrgErrors(errors)
+      setCreateOrgBusy(false)
+      return
+    }
+
+    try {
+      const res = await apiFetch('/profile/create-organizer', {
+        method: 'POST',
+        body: JSON.stringify({ githubUsername: newOrgGithub, institute: newOrgInstitute, instituteEmail: newOrgEmail }),
+      })
+
+      const json = await res.json().catch(() => ({}))
+
+      if (!res.ok) {
+        setCreateOrgMessage(json.message || 'Failed to create organizer')
+      } else {
+        setCreateOrgMessage('Organizer created/updated')
+        setShowCreateOrganizer(false)
+        setNewOrgGithub('')
+        setNewOrgInstitute('')
+        setNewOrgEmail('')
+        setCreateOrgErrors(null)
+        await refresh()
+      }
+    } catch (err) {
+      console.error(err)
+      setCreateOrgMessage('Something went wrong')
+    } finally {
+      setCreateOrgBusy(false)
+    }
+  }
+
   if (!mounted) return null
 
   if (loading) {
@@ -409,7 +515,7 @@ export default function ProfilePage() {
           )}
         </Card>
 
-        <Card className="border-border/60 lg:col-span-2">
+        <Card className={`border-border/60 ${isOrganizer ? 'lg:col-span-1' : 'lg:col-span-2'}`}>
           <CardHeader>
             <CardTitle>Repositories</CardTitle>
 
@@ -425,7 +531,7 @@ export default function ProfilePage() {
             </p>
           </CardContent>
 
-          <CardFooter>
+          <CardFooter className='flex gap-3'>
             <Link href="/repos">
               <Button>
                 Browse Repositories
@@ -433,6 +539,22 @@ export default function ProfilePage() {
             </Link>
           </CardFooter>
         </Card>
+        {isOrganizer && (
+          <Card className='border-border/60 lg:col-span-1'>
+            <CardHeader className='h-full'>
+              <CardTitle>Add Organizer</CardTitle>
+              <CardDescription>
+                If you are an organizer and want to create organizer accounts for others, click the button below.
+              </CardDescription>
+            </CardHeader>
+            <CardFooter>
+            <div className="flex items-center gap-2">
+              <Button onClick={() => setShowCreateOrganizer(true)}>Create Organizer</Button>
+              {createOrgMessage && <div className="text-sm text-muted-foreground">{createOrgMessage}</div>}
+            </div>
+          </CardFooter>
+        </Card>
+        )}
       </div>
 
       <div className="mt-8 space-y-6">
@@ -477,6 +599,7 @@ export default function ProfilePage() {
                 </div>
               </form>
             </CardContent>
+
           </Card>
         )}
 
@@ -546,7 +669,7 @@ export default function ProfilePage() {
           </Card>
         )}
 
-        <Card className="border-border/60">
+        {/* <Card className="border-border/60">
           <CardHeader>
             <CardTitle>Recent Activity</CardTitle>
 
@@ -560,7 +683,7 @@ export default function ProfilePage() {
               No recent activity yet.
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
       </div>
 
       {showConfirm && (
@@ -574,14 +697,18 @@ export default function ProfilePage() {
         />
       )}
 
-      {showSubmitConfirm && (
-        <ConfirmSubmitCard
-          onCancel={() => setShowSubmitConfirm(false)}
-          onConfirm={async () => {
-            setShowSubmitConfirm(false)
-            await submitRepo()
-          }}
-          busy={repoBusy}
+      {showCreateOrganizer && (
+        <CreateOrganizerCard
+          onCancel={() => setShowCreateOrganizer(false)}
+          onCreate={handleCreateOrganizer}
+          busy={createOrgBusy}
+          githubValue={newOrgGithub}
+          setGithub={setNewOrgGithub}
+          instituteValue={newOrgInstitute}
+          setInstitute={setNewOrgInstitute}
+          emailValue={newOrgEmail}
+          setEmail={setNewOrgEmail}
+          errors={createOrgErrors}
         />
       )}
 
