@@ -26,3 +26,15 @@ export const authenticateJWT = async (req: Request, res: Response, next: NextFun
     res.sendStatus(401)
   }
 }
+
+export const requireRole = (roleName: string) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const user = (req as any).user
+    if (!user) return res.sendStatus(401)
+
+    const has = (user.roles || []).some((r: any) => r.role?.name === roleName)
+    if (!has) return res.status(403).json({ message: `Requires ${roleName} role` })
+
+    next()
+  }
+}
