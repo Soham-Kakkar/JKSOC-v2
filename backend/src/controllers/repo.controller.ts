@@ -64,6 +64,36 @@ export const approveRepo = async (req: Request, res: Response) => {
   }
 }
 
+export const rejectRepo = async (req: Request, res: Response) => {
+  const id = Number(req.params.id)
+  const user = (req as any).user
+
+  if (Number.isNaN(id)) {
+    return res.status(400).json({ message: 'Invalid repository id' })
+  }
+
+  // Check ORGANIZER role
+  const isOrganizer = (user.roles || []).some((r: any) => r.role?.name === 'ORGANIZER')
+  if (!isOrganizer) {
+    return res.status(403).json({ message: 'Only organizers can reject repositories' })
+  }
+
+  try {
+    const repo = await repoService.findRepositoryById(id)
+    if (!repo) return res.status(404).json({ message: 'Repository not found' })
+
+    if (repo.status === 'REJECTED') {
+      return res.json({ message: 'Repository already rejected', repo })
+    }
+
+    const updated = await repoService.rejectRepository(id)
+    return res.json(updated)
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({ message: 'Failed to reject repository' })
+  }
+}
+
 export const getPendingRepos = async (req: Request, res: Response) => {
   const user = (req as any).user
   if (!user) return res.sendStatus(401)

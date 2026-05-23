@@ -59,6 +59,52 @@ function ConfirmUpgradeCard({
   )
 }
 
+function ConfirmSubmitCard({ onCancel, onConfirm, busy }: { onCancel: () => void; onConfirm: () => Promise<void>; busy: boolean }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onCancel} />
+
+      <Card className="relative z-10 max-w-md w-full">
+        <CardHeader>
+          <CardTitle>Confirm Repository Submission</CardTitle>
+          <CardDescription>This action cannot be reversed. Submitting a repository sends it for organizer review.</CardDescription>
+        </CardHeader>
+
+        <CardFooter className="justify-end">
+          <Button variant="ghost" onClick={onCancel} disabled={busy}>Cancel</Button>
+          <Button onClick={onConfirm} disabled={busy}>{busy ? 'Submitting…' : 'Submit Repository'}</Button>
+        </CardFooter>
+      </Card>
+    </div>
+  )
+}
+
+function ConfirmReviewCard({ action, onCancel, onConfirm, busy }: { action: 'approve' | 'reject'; onCancel: () => void; onConfirm: () => Promise<void>; busy: boolean }) {
+  const title = action === 'approve' ? 'Approve Repository?' : 'Reject Repository?'
+  const desc = action === 'approve'
+    ? 'Approving will mark this repository as APPROVED and include it in the scoring scope.'
+    : 'Rejecting will mark this repository as REJECTED and it will not be eligible for the program.'
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onCancel} />
+
+      <Card className="relative z-10 w-full max-w-md border-border/60 shadow-2xl">
+        <CardHeader className="space-y-3">
+          <CardTitle>{title}</CardTitle>
+          <CardDescription className="leading-relaxed">{desc}</CardDescription>
+        </CardHeader>
+
+        <CardFooter className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={onCancel} disabled={busy}>Cancel</Button>
+          <Button onClick={onConfirm} disabled={busy} className={action === 'reject' ? 'bg-red-600 text-white hover:bg-red-700' : ''}>
+            {busy ? (action === 'approve' ? 'Approving…' : 'Rejecting…') : (action === 'approve' ? 'Approve' : 'Reject')}
+          </Button>
+        </CardFooter>
+      </Card>
+    </div>
+  )
+}
 type RoleEntry = {
   role?: {
     name?: string
@@ -87,10 +133,13 @@ export default function ProfilePage() {
   const [repoUrl, setRepoUrl] = useState('')
   const [repoBusy, setRepoBusy] = useState(false)
   const [repoMessage, setRepoMessage] = useState<string | null>(null)
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false)
 
   const [pendingRepos, setPendingRepos] = useState<PendingRepo[]>([])
   const [pendingLoading, setPendingLoading] = useState(false)
   const [pendingError, setPendingError] = useState<string | null>(null)
+  const [reviewAction, setReviewAction] = useState<{ id: number; action: 'approve' | 'reject' } | null>(null)
+  const [reviewBusy, setReviewBusy] = useState(false)
 
   const isMaintainer = !!user?.roles?.some(
     (r: RoleEntry) => r.role?.name === 'MAINTAINER'
@@ -218,6 +267,36 @@ export default function ProfilePage() {
       setPendingRepos((prev) => prev.filter((r) => r.id !== id))
     } catch (err) {
       console.error(err)
+    }
+  }
+
+  const rejectPendingRepo = async (id: number) => {
+    try {
+      const res = await apiFetch(`/repos/${id}/reject`, {
+        method: 'POST',
+      })
+
+      if (!res.ok) throw new Error('Reject failed')
+
+      setPendingRepos((prev) => prev.filter((r) => r.id !== id))
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const confirmReviewAction = async () => {
+    if (!reviewAction) return
+    setReviewBusy(true)
+    const { id, action } = reviewAction
+    try {
+      if (action === 'approve') {
+        await approvePendingRepo(id)
+      } else {
+        await rejectPendingRepo(id)
+      }
+    } finally {
+      setReviewBusy(false)
+      setReviewAction(null)
     }
   }
 
@@ -369,7 +448,7 @@ export default function ProfilePage() {
 
             <CardContent>
               <form
-                onSubmit={submitRepo}
+                onSubmit={(e) => { e.preventDefault(); setShowSubmitConfirm(true) }}
                 className="space-y-4"
               >
                 <div className="space-y-2">
@@ -385,7 +464,7 @@ export default function ProfilePage() {
                   />
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-3">
                   <Button type="submit" disabled={repoBusy}>
                     {repoBusy ? 'Submitting...' : 'Submit Repository'}
                   </Button>
@@ -443,14 +522,22 @@ export default function ProfilePage() {
                         </div>
                       </div>
 
-                      <Button
-                        size="sm"
-                        onClick={() =>
-                          approvePendingRepo(repo.id)
-                        }
-                      >
-                        Approve
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => setReviewAction({ id: repo.id, action: 'approve' })}
+                        >
+                          Approve
+                        </Button>
+
+                        <Button
+                          size="sm"
+                          className="bg-red-600 text-white hover:bg-red-700"
+                          onClick={() => setReviewAction({ id: repo.id, action: 'reject' })}
+                        >
+                          Reject
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -484,6 +571,37 @@ export default function ProfilePage() {
             await onUpgrade()
           }}
           busy={busy}
+        />
+      )}
+
+      {showSubmitConfirm && (
+        <ConfirmSubmitCard
+          onCancel={() => setShowSubmitConfirm(false)}
+          onConfirm={async () => {
+            setShowSubmitConfirm(false)
+            await submitRepo()
+          }}
+          busy={repoBusy}
+        />
+      )}
+
+      {reviewAction && (
+        <ConfirmReviewCard
+          action={reviewAction.action}
+          onCancel={() => setReviewAction(null)}
+          onConfirm={confirmReviewAction}
+          busy={reviewBusy}
+        />
+      )}
+
+      {showSubmitConfirm && (
+        <ConfirmSubmitCard
+          onCancel={() => setShowSubmitConfirm(false)}
+          onConfirm={async () => {
+            setShowSubmitConfirm(false)
+            await submitRepo()
+          }}
+          busy={repoBusy}
         />
       )}
     </div>

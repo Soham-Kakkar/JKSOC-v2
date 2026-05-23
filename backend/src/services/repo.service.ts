@@ -44,3 +44,10 @@ export const approveRepository = async (id: number) => {
     data: { status: 'APPROVED' },
   })
 }
+
+export const rejectRepository = async (id: number) => {
+  return prisma.repository.update({
+    where: { id },
+    data: { status: 'REJECTED' },
+  })
+}

@@ -83,7 +83,7 @@ export default function VerifyInstitutePage() {
       })
       const data = await res.json()
       if (res.ok) {
-        router.push('/')
+        router.push('/profile')
       } else {
         setError(data.message || "Invalid OTP")
       }
@@ -95,9 +95,10 @@ export default function VerifyInstitutePage() {
   }
 
   return (
-      <Card className="max-w-md mx-auto text-center">
+    <div className="flex justify-center items-center">
+      <Card className="max-w-md w-screen mx-auto text-center h-fit">
         <CardHeader className="text-xl font-semibold mb-4">
-            Enter Verification Code
+          Enter Verification Code
         </CardHeader>
 
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
@@ -150,5 +151,6 @@ export default function VerifyInstitutePage() {
           </CardContent>
         )}
       </Card>
+    </div>
   )
 }
